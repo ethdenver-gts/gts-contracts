@@ -294,14 +294,6 @@ contract GlobalTradeSystem is ERC721Full {
         return lastOfferId++;
     }
 
-    // TODO
-    function matchOffers(uint _bidOfferId, uint _askOfferId) public {
-        require(areOffersMatching(_bidOfferId, _askOfferId), "Only matching offers can be matched");
-
-        TradeOfferType _offerType = offers[_bidOfferId].offerType;
-
-    }
-
     // ------------------------------------------------------------------------------------------ //
     // EXTERNAL VIEW FUNCTIONS
     // ------------------------------------------------------------------------------------------ //
