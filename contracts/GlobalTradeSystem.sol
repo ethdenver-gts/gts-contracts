@@ -31,6 +31,7 @@ contract GlobalTradeSystem is ERC721Full {
     struct TradeOffer {
         address sender;
 
+
         uint[] offeredTokensIds;
 
         string offeredAssetURI;
@@ -41,6 +42,7 @@ contract GlobalTradeSystem is ERC721Full {
 
         string wantedAssetURI;
         uint wantedAssetsQuantity;
+
 
         TradeOfferState state;
 
@@ -112,10 +114,15 @@ contract GlobalTradeSystem is ERC721Full {
         _;
     }
 
-    modifier enoughERC20Tokens(address _ERC20Address, address _who, uint _minimalAmount) {
+    modifier enoughDepositedERC20Tokens(address _ERC20Address, address _who, uint _minimalAmount) {
         ERC20 erc20 = ERC20(_ERC20Address);
         uint _balance = erc20.balanceOf(_who);
-        require(_balance >= _minimalAmount, "To call this function your erc20 balance must be above the minimal amount");
+        require(erc20.transferFrom(msg.sender, address(this), _minimalAmount), "To call this function your erc20 balance must be above the minimal amount");
+        _;
+    }
+
+    modifier enoughtEther(uint _minimalAmount) {
+        require(msg.value >= _minimalAmount);
         _;
     }
 
@@ -226,7 +233,7 @@ contract GlobalTradeSystem is ERC721Full {
     }
 
     function postERC20ForAssetTradeOffer(address _ERC20Address, uint _quantity, uint[] memory _wantedTokens) public
-    enoughERC20Tokens(_ERC20Address, msg.sender, _quantity)
+    enoughDepositedERC20Tokens(_ERC20Address, msg.sender, _quantity)
     returns(uint)
     {
         TradeOffer memory _tradeOffer;
@@ -256,10 +263,66 @@ contract GlobalTradeSystem is ERC721Full {
         return lastOfferId++;
     }
 
-    // TODO
     function postEtherForAssetTradeOffer(uint _weiAmount, uint[] memory _wantedTokens) public payable
+    enoughtEther(_weiAmount)
     returns(uint)
     {
+        TradeOffer memory _tradeOffer;
+        _tradeOffer.sender = msg.sender;
+        string memory _offeredAssetURI = string(abi.encode(address(0)));
+        _tradeOffer.offeredAssetURI = _offeredAssetURI;
+        _tradeOffer.offeredAssetsQuantity = _weiAmount;
+        _tradeOffer.wantedTokensIds = _wantedTokens;
+        
+        _tradeOffer.state = TradeOfferState.PENDING;
+        _tradeOffer.offerType = TradeOfferType.ETHER_FOR_ASSET;
+        offers[lastOfferId] = _tradeOffer;
+
+        uint[] memory _offeredTokens;
+
+        emit TradeOfferRegistration(
+            lastOfferId,
+            msg.sender,
+            _offeredTokens,
+            _offeredAssetURI,
+            _tradeOffer.offeredAssetsQuantity,
+            _wantedTokens,
+            "",
+            0,
+            TradeOfferType.ETHER_FOR_ASSET
+        );
+        return lastOfferId++;
+    }
+
+    // TODO
+    function matchOffers(uint _bidOfferId, uint _askOfferId) public {
+        require(areOffersMatching(_bidOfferId, _askOfferId), "Only matching offers can be matched");
+
+        TradeOfferType _offerType = offers[_bidOfferId].offerType;
+
+    }
+
+    // ------------------------------------------------------------------------------------------ //
+    // EXTERNAL VIEW FUNCTIONS
+    // ------------------------------------------------------------------------------------------ //
+
+    function areOffersMatching(uint _bidOfferId, uint _askOfferId) public view returns(bool) {
+        uint[] memory _offeredTokens = offers[_bidOfferId].offeredTokensIds;
+        string memory _offeredAssetURI = offers[_bidOfferId].offeredAssetURI;
+        uint _offeredAssetsQuantity = offers[_bidOfferId].offeredAssetsQuantity;
+
+        uint[] memory _wantedTokens = offers[_askOfferId].wantedTokensIds;
+        string memory _wantedAssetURI = offers[_askOfferId].wantedAssetURI;
+        uint _wantedAssetsQuantity = offers[_askOfferId].wantedAssetsQuantity;
+
+        bool _areOffersMatching = (
+                    keccak256(abi.encodePacked(_offeredTokens)) == keccak256(abi.encodePacked(_wantedTokens))
+                    &&
+                    keccak256(abi.encodePacked(_offeredAssetURI)) == keccak256(abi.encodePacked(_wantedAssetURI))
+                    &&
+                    _offeredAssetsQuantity == _wantedAssetsQuantity
+                );
+        return _areOffersMatching;
     }
 
 
