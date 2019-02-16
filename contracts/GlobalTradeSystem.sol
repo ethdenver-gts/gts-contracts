@@ -1,6 +1,7 @@
 pragma solidity 0.5.0;
 
 import "../node_modules/openzeppelin-solidity/contracts/token/ERC721/ERC721Full.sol";
+import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 
 contract GlobalTradeSystem is ERC721Full {
 
@@ -17,7 +18,9 @@ contract GlobalTradeSystem is ERC721Full {
     enum TradeOfferType {
         ASSET_FOR_ASSET,
         ASSET_FOR_ERC20,
-        ASSET_FOR_ETHER
+        ASSET_FOR_ETHER,
+        ERC20_FOR_ASSET,
+        ETHER_FOR_ASSET
     }
 
     struct Asset {
@@ -106,6 +109,13 @@ contract GlobalTradeSystem is ERC721Full {
         for(uint i = 0; i < _tokenIds.length; i++) {
             require(ERC721.ownerOf(_tokenIds[i]) == msg.sender, "In order to operate on some tokens you need to be theirs owner");
         }
+        _;
+    }
+
+    modifier enoughERC20Tokens(address _ERC20Address, address _who, uint _minimalAmount) {
+        ERC20 erc20 = ERC20(_ERC20Address);
+        uint _balance = erc20.balanceOf(_who);
+        require(_balance >= _minimalAmount, "To call this function your erc20 balance must be above the minimal amount");
         _;
     }
 
@@ -215,7 +225,42 @@ contract GlobalTradeSystem is ERC721Full {
         return lastOfferId++;
     }
 
+    function postERC20ForAssetTradeOffer(address _ERC20Address, uint _quantity, uint[] memory _wantedTokens) public
+    enoughERC20Tokens(_ERC20Address, msg.sender, _quantity)
+    returns(uint)
+    {
+        TradeOffer memory _tradeOffer;
+        _tradeOffer.sender = msg.sender;
+        string memory _offeredAssetURI = string(abi.encode(_ERC20Address));
+        _tradeOffer.offeredAssetURI = _offeredAssetURI;
+        _tradeOffer.offeredAssetsQuantity = _quantity;
+        _tradeOffer.wantedTokensIds = _wantedTokens;
+        
+        _tradeOffer.state = TradeOfferState.PENDING;
+        _tradeOffer.offerType = TradeOfferType.ERC20_FOR_ASSET;
+        offers[lastOfferId] = _tradeOffer;
 
+        uint[] memory _offeredTokens;
+
+        emit TradeOfferRegistration(
+            lastOfferId,
+            msg.sender,
+            _offeredTokens,
+            _offeredAssetURI,
+            _tradeOffer.offeredAssetsQuantity,
+            _wantedTokens,
+            "",
+            0,
+            TradeOfferType.ERC20_FOR_ASSET
+        );
+        return lastOfferId++;
+    }
+
+    // TODO
+    function postEtherForAssetTradeOffer(uint _weiAmount, uint[] memory _wantedTokens) public payable
+    returns(uint)
+    {
+    }
 
 
 }
